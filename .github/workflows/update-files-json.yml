@@ -1,0 +1,49 @@
+name: Update files.json
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'projects/**'
+      - '.github/workflows/update-files-json.yml'
+
+jobs:
+  generate-files-json:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate files.json
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('projects')
+          projects = {}
+          for project in sorted([p for p in root.iterdir() if p.is_dir()], key=lambda p: p.name):
+              projects[project.name] = sorted([f.name for f in project.iterdir() if f.is_file()])
+
+          output = {'projects': projects}
+          with open('files.json', 'w', encoding='utf-8') as fp:
+              json.dump(output, fp, indent=2, ensure_ascii=False)
+          print('Generated files.json')
+          PY
+
+      - name: Commit updated files.json
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add files.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update files.json from project structure'
+            git push
+          else
+            echo 'No changes to commit.'
+          fi
